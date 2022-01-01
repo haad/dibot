@@ -1,5 +1,6 @@
 import logging
-import requests
+import aiohttp
+import asyncio
 
 # from enum import Enum
 from bs4 import BeautifulSoup
@@ -13,49 +14,54 @@ class Scraper:
         self.aut = 'https://diroastery.sk/kategoria-produktu/kava/automat-kava/'
         self.coffees = []
 
-    def scrapeEspresso(self):
-        self.scrapeMainData(self.esp, 'espresso')
+    async def scrapeEspresso(self):
+        await self.scrapeMainData(self.esp, 'espresso')
 
-    def scrapeFilter(self):
-        self.scrapeMainData(self.esp, 'filter')
+    async def scrapeFilter(self):
+        await self.scrapeMainData(self.esp, 'filter')
 
-    def scrapeAutomat(self):
-        self.scrapeMainData(self.esp, 'automat')
+    async def scrapeAutomat(self):
+        await self.scrapeMainData(self.esp, 'automat')
 
-    def scrapeMainData(self, link, ctype):
+    async def scrapeMainData(self, link: str, ctype: str):
 
         logging.info('Scraping info from: {}, for coffee type: '.format(link, ctype))
 
-        r = requests.get(link)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(link) as r:
+                soup = BeautifulSoup(await r.text(),'html.parser')
 
-        soup = BeautifulSoup(r.text,'html.parser')
+                items = soup.find_all("div", class_="astra-shop-summary-wrap" )
 
-        items = soup.find_all("div", class_="astra-shop-summary-wrap" )
+                await asyncio.gather(*[self.processMainElement(el, ctype) for el in items])
 
-        for el in items:
-            name = el.findChild("a").get_text(strip=True)
-            logging.info('Processing coffee name: {}'.format(name))
+                await asyncio.gather(*[self.gatherCoffeeInfo(coffee) for coffee in self.coffees])
 
-
-            if (coffee := self.getCoffeeIfExists(name)) is None:
-                coffee = co.Coffee()
-
-                coffee.name = name
-                coffee.link = el.findChild("a").get('href')
-                coffee.price_low = el.findChildren("bdi")[0].get_text(strip=True)
-                coffee.price_high = el.findChildren("bdi")[-1].get_text(strip=True)
-
-                coffee.type.add(ctype)
-
-                coffee.scrapeCoffeeInfo()
-
-                self.coffees.append(coffee)
-            else:
-                coffee.type.add(ctype)
-                self.replaceCoffee(coffee)
+    async def gatherCoffeeInfo(self, coffee: co.Coffee):
+        await coffee.scrapeCoffeeInfo()
 
 
-    def getCoffeeIfExists(self, name):
+    async def processMainElement(self, el, ctype: str):
+        name = el.findChild("a").get_text(strip=True)
+        logging.info('Processing coffee name: {}'.format(name))
+
+        if (coffee := self.getCoffeeIfExists(name)) is None:
+            coffee = co.Coffee()
+
+            coffee.name = name
+            coffee.link = el.findChild("a").get('href')
+            coffee.price_low = el.findChildren("bdi")[0].get_text(strip=True)
+            coffee.price_high = el.findChildren("bdi")[-1].get_text(strip=True)
+
+            coffee.type.add(ctype)
+
+            self.coffees.append(coffee)
+        else:
+            coffee.type.add(ctype)
+            self.replaceCoffee(coffee)
+
+
+    def getCoffeeIfExists(self, name: str) -> co.Coffee:
         try:
             c = [x for x in self.coffees if x.name == name][0]
         except IndexError:
@@ -63,7 +69,7 @@ class Scraper:
         return c
 
 
-    def replaceCoffee(self, coffee):
+    def replaceCoffee(self, coffee: co.Coffee):
         self.coffees = [ coffee if item.name == coffee.name else item for item in self.coffees ]
 
 

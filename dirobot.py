@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import logging
 import os
 import pickle
@@ -21,7 +22,7 @@ def loadCoffeeDB(file) -> list:
 def checkCoffeeDBtimestamp(file) -> bool:
     return (round(time.time() - os.stat(file).st_mtime) / 60 < 1) and (False)
 
-def main():
+async def main():
     logging.basicConfig(level=logging.INFO)
 
     start_time = time.time()
@@ -32,8 +33,8 @@ def main():
         s.coffees = loadCoffeeDB(COFFEE_DB)
     else:
         logging.info('Updating scraped coffees...')
-        s.scrapeEspresso()
-        s.scrapeFilter()
+        await s.scrapeEspresso()
+        await s.scrapeFilter()
 
     logging.info('--- Scraping took: {} seconds ---'.format(time.time() - start_time))
 
@@ -42,4 +43,4 @@ def main():
     dumpCoffeeDB(COFFEE_DB, s.coffees)
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

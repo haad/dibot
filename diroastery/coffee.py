@@ -6,6 +6,7 @@
 import requests
 import logging
 import unicodedata
+import aiohttp
 
 
 # from enum import Enum
@@ -25,15 +26,15 @@ class Coffee(dict):
 
       self.metadata = {}
 
-    def scrapeCoffeeInfo(self):
-      r = requests.get(self.link)
+    async def scrapeCoffeeInfo(self):
+      async with aiohttp.ClientSession() as session:
+        async with session.get(self.link) as r:
+          soup = BeautifulSoup(await r.text(),'html.parser')
 
-      soup = BeautifulSoup(r.text,'html.parser')
+          logging.info('Scraping info for coffee {} from link {}'.format(self.name, self.link))
 
-      logging.info('Scraping info for coffee {} from link {}'.format(self.name, self.link))
-
-      self.desc = unicodedata.normalize("NFKD", soup.find("div", class_="woocommerce-product-details__short-description" ).findChild("p").get_text(strip=True))
-      self.img = soup.find("div", class_="woocommerce-product-gallery__image" ).findChild("a").attrs.get('href')
+          self.desc = unicodedata.normalize("NFKD", soup.find("div", class_="woocommerce-product-details__short-description" ).findChild("p").get_text(strip=True))
+          self.img = soup.find("div", class_="woocommerce-product-gallery__image" ).findChild("a").attrs.get('href')
 
 
     def __str__(self):
