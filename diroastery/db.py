@@ -31,9 +31,7 @@ async def scrapeCoffeeDBinfo() -> scraper.Scraper:
         s.coffees = loadCoffeeDB(COFFEE_DB_PATH)
     else:
         logging.info('Updating scraped coffees...')
-        await s.scrapeEspresso()
-        await s.scrapeFilter()
-        await s.scrapeAutomat()
+        await s.scrapeCoffee()
 
     logging.info('--- Scraping took: {} seconds ---'.format(round(time.time() - start_time, 4)))
 
